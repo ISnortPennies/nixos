@@ -1,6 +1,6 @@
 inputs@{ self, unstable, ... }:
 let
-  lib = import ./lib inputs;
+  lib = unstable.lib.extend (import ./lib inputs);
 in
 lib.gerg-utils (s: unstable.legacyPackages.${s}) {
   inherit lib;

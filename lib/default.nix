@@ -4,14 +4,12 @@ inputs@{
   disko,
   ...
 }:
-let
-  inherit (stable) lib;
-in
+final: prev:
 # Only good use case for rec
-rec {
-  wrench = lib.flip lib.pipe;
+{
+  wrench = prev.flip prev.pipe;
 
-  needsSystem = lib.flip builtins.elem [
+  needsSystem = prev.flip builtins.elem [
     "defaultPackage"
     "devShell"
     "devShells"
@@ -22,27 +20,29 @@ rec {
 
   constructInputs' =
     system:
-    wrench [
-      (lib.filterAttrs (_: lib.isType "flake"))
-      (lib.mapAttrs (_: lib.mapAttrs (name: value: if needsSystem name then value.${system} else value)))
+    final.wrench [
+      (prev.filterAttrs (_: prev.isType "flake"))
+      (prev.mapAttrs (
+        _: prev.mapAttrs (name: value: if final.needsSystem name then value.${system} else value)
+      ))
     ];
 
-  listNixFilesRecursive = wrench [
+  listNixFilesRecursive = final.wrench [
     builtins.unsafeDiscardStringContext
-    lib.filesystem.listFilesRecursive
-    (builtins.filter (x: !lib.hasPrefix "_" (builtins.baseNameOf x) && lib.hasSuffix ".nix" x))
+    prev.filesystem.listFilesRecursive
+    (builtins.filter (x: !prev.hasPrefix "_" (builtins.baseNameOf x) && prev.hasSuffix ".nix" x))
   ];
 
   mkModules =
     path:
-    lib.pipe path [
-      listNixFilesRecursive
+    prev.pipe path [
+      final.listNixFilesRecursive
       (map (name: {
-        name = lib.pipe name [
-          (lib.removeSuffix ".nix")
-          (lib.removePrefix "${path}/")
+        name = prev.pipe name [
+          (prev.removeSuffix ".nix")
+          (prev.removePrefix "${path}/")
         ];
-        value = addSchizophreniaToModule name;
+        value = final.addSchizophreniaToModule name;
       }))
       builtins.listToAttrs
     ];
@@ -58,12 +58,12 @@ rec {
       it doesn't need arguments and error
       message locations will function correctly
     */
-    if !lib.isFunction imported then
+    if !prev.isFunction imported then
       x
     else
       let
         # all arguments defined in the module
-        funcArgs = lib.functionArgs imported;
+        funcArgs = prev.functionArgs imported;
         /*
           The names of all arguments which will be
           available to be inserted into the module arguments
@@ -93,9 +93,9 @@ rec {
           arguments which will be inserted
           set to the before per-system values
         */
-        providedArgs = lib.pipe funcArgs [
-          (lib.filterAttrs (n: _: builtins.elem n argNames))
-          (lib.mapAttrs (n: _: argsPre.${n} or { }))
+        providedArgs = prev.pipe funcArgs [
+          (prev.filterAttrs (n: _: builtins.elem n argNames))
+          (prev.mapAttrs (n: _: argsPre.${n} or { }))
         ];
 
         /*
@@ -103,7 +103,7 @@ rec {
           not provided here. either to be
           provided by the module system or invalid
         */
-        neededArgs = lib.filterAttrs (n: _: !builtins.elem n argNames) funcArgs;
+        neededArgs = prev.filterAttrs (n: _: !builtins.elem n argNames) funcArgs;
       in
       {
         __functionArgs = neededArgs // {
@@ -125,14 +125,14 @@ rec {
               take module system provided arguments
               filter them so only the required ones are passed
             */
-            (lib.filterAttrs (n: _: neededArgs ? ${n}) args)
+            (prev.filterAttrs (n: _: neededArgs ? ${n}) args)
             # add needed arguments
             // (
               providedArgs
               # add system dependent arguments
               // (
                 let
-                  inputs' = constructInputs' args.pkgs.stdenv.system inputs;
+                  inputs' = final.constructInputs' args.pkgs.stdenv.system inputs;
 
                   actuallyAllArgs = inputs' // {
                     inherit inputs';
@@ -140,7 +140,7 @@ rec {
                     inherit (inputs) self;
                   };
                 in
-                lib.filterAttrs (n: _: providedArgs ? ${n}) actuallyAllArgs
+                prev.filterAttrs (n: _: providedArgs ? ${n}) actuallyAllArgs
               )
             )
           )
@@ -152,7 +152,7 @@ rec {
 
   gerg-utils =
     pkgsf: outputs:
-    lib.pipe
+    prev.pipe
       [
         "x86_64-linux"
         "aarch64-linux"
@@ -161,41 +161,41 @@ rec {
         (map (
           system:
           builtins.mapAttrs (
-            name: value: if needsSystem name then { ${system} = value (pkgsf system); } else value
+            name: value: if final.needsSystem name then { ${system} = value (pkgsf system); } else value
           ) outputs
         ))
-        (lib.foldAttrs lib.mergeAttrs { })
+        (prev.foldAttrs prev.mergeAttrs { })
       ];
 
   mkHosts =
     system:
-    lib.flip lib.genAttrs (
+    prev.flip prev.genAttrs (
       hostName:
-      # Whats lib.nixosSystem? never heard of her
-      lib.evalModules {
+      # Whats prev.nixosSystem? never heard of her
+      prev.evalModules {
         specialArgs.modulesPath = "${stable}/nixos/modules";
 
         modules = builtins.concatLists [
           (builtins.attrValues self.nixosModules)
-          (map addSchizophreniaToModule (listNixFilesRecursive "${self}/hosts/${hostName}"))
+          (map final.addSchizophreniaToModule (final.listNixFilesRecursive "${self}/hosts/${hostName}"))
           (import "${stable}/nixos/modules/module-list.nix")
-          (lib.singleton {
+          (prev.singleton {
             networking = {
               inherit hostName;
             };
             nixpkgs.hostPlatform = system;
           })
-          (lib.optionals (self.diskoConfigurations ? "disko-${hostName}") [
+          (prev.optionals (self.diskoConfigurations ? "disko-${hostName}") [
             self.diskoConfigurations."disko-${hostName}"
             disko.nixosModules.default
           ])
         ];
       }
     );
-  mkDisko = wrench [
+  mkDisko = final.wrench [
     (map (name: {
       name = "disko-${name}";
-      value.disko.devices = import "${self}/disko/${name}.nix" lib;
+      value.disko.devices = import "${self}/disko/${name}.nix" prev;
     }))
     builtins.listToAttrs
   ];
@@ -217,9 +217,9 @@ rec {
   */
   mkPackages =
     path: pkgs:
-    lib.pipe path [
+    prev.pipe path [
       builtins.readDir
-      (lib.filterAttrs (_: v: v == "directory"))
+      (prev.filterAttrs (_: v: v == "directory"))
       builtins.attrNames
       (map (
         n:
@@ -233,21 +233,21 @@ rec {
                 pkgs
                 // (
                   let
-                    inputs' = constructInputs' pkgs.stdenv.system inputs;
+                    inputs' = final.constructInputs' pkgs.stdenv.system inputs;
                   in
                   {
                     inherit inputs' inputs;
                     self' = inputs'.self;
                     inherit (inputs) self;
                     # npins sources if i ever use them
-                    # sources = lib.mapAttrs (_: pkgs.npins.mkSource) (lib.importJSON "${self}/packages/sources.json").pins;
+                    # sources = prev.mapAttrs (_: pkgs.npins.mkSource) (prev.importJSON "${self}/packages/sources.json").pins;
                   }
                 );
-              _callPackage = lib.callPackageWith defaultArgs;
+              _callPackage = prev.callPackageWith defaultArgs;
               fullPath = "${p}/${file}.nix";
               callPath = "${p}/call.nix";
             in
-            assert lib.assertMsg (builtins.pathExists fullPath)
+            assert prev.assertMsg (builtins.pathExists fullPath)
               "File attempting to be callPackage'd '${fullPath}' does not exist";
 
             if builtins.pathExists callPath then
@@ -270,6 +270,6 @@ rec {
           { ${n} = callPackage "package" { }; }
 
       ))
-      lib.mergeAttrsList
+      prev.mergeAttrsList
     ];
 }
