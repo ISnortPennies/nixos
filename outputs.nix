@@ -8,6 +8,7 @@ lib.gerg-utils (s: unstable.legacyPackages.${s}) {
     "gerg-desktop"
     "media-laptop"
     "iso"
+    "minecraft"
   ];
 
   nixosModules = lib.mkModules "${self}/modules";
@@ -15,6 +16,7 @@ lib.gerg-utils (s: unstable.legacyPackages.${s}) {
   diskoConfigurations = lib.mkDisko [
     "gerg-desktop"
     "media-laptop"
+    "minecraft"
   ];
 
   formatter = pkgs: inputs.self.packages.${pkgs.stdenv.system}.lint;

@@ -8,7 +8,7 @@
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "papermc";
 
-  version = "1.20.1.83";
+  version = "1.20.1.196";
 
   src =
     let
@@ -17,7 +17,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     in
     fetchurl {
       url = "https://papermc.io/api/v2/projects/paper/versions/${mcVersion}/builds/${buildNum}/downloads/paper-${mcVersion}-${buildNum}.jar";
-      hash = "sha256-HQpc3MOXa1wkXqgm9ciQj04FUIyuupnYiu+2RZ/sXE4=";
+      hash = "sha256-I0qbMgmBAMb8EWZk1k42zNtYtbZJrw+AvMywiwJV6uo=";
     };
 
   installPhase = ''

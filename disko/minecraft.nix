@@ -1,4 +1,4 @@
-{
+_: {
   disk = {
     main = {
       device = "/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_51045339";
@@ -16,7 +16,7 @@
             };
           };
           root = {
-           end = "100%";
+            size = "100%";
             content = {
               type = "filesystem";
               format = "xfs";
